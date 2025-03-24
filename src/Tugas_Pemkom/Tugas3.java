@@ -1,125 +1,96 @@
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.util.Random;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-public class Tugas3 extends JFrame {
-    private JLabel timerLabel;
-    private int timeLeft = 30;
-    private Timer timer;
-    private char[][] board;
-    private boolean playerTurn = true;
-    private Random random = new Random();
-    private static final int SIZE = 9;
-
+public class Tugas3 {
+    private JFrame frame;
+    private JTextArea textArea;
+    private JButton startButton, stopButton;
+    private ExecutorService executor;
+    private boolean isRunning = false;
+    
     public Tugas3() {
-        setTitle("SOS Game with AI");
-        setSize(600, 600);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLayout(new BorderLayout());
+        frame = new JFrame("Simulasi Antrean Bank");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(400, 300);
+        frame.setLayout(new BorderLayout());
 
-        timerLabel = new JLabel("Waktu: " + timeLeft + " detik", SwingConstants.CENTER);
-        add(timerLabel, BorderLayout.NORTH);
+        textArea = new JTextArea();
+        textArea.setEditable(false);
+        frame.add(new JScrollPane(textArea), BorderLayout.CENTER);
 
-        board = new char[SIZE][SIZE];
-        add(new SOSBoard(), BorderLayout.CENTER);
+        JPanel panel = new JPanel();
+        startButton = new JButton("Mulai Layanan");
+        stopButton = new JButton("Hentikan Layanan");
+        stopButton.setEnabled(false);
+        
+        panel.add(startButton);
+        panel.add(stopButton);
+        frame.add(panel, BorderLayout.SOUTH);
 
-        startTimer();
-    }
-
-    private void startTimer() {
-        timer = new Timer();
-        timer.scheduleAtFixedRate(new TimerTask() {
+        startButton.addActionListener(new ActionListener() {
             @Override
-            public void run() {
-                if (timeLeft > 0) {
-                    timeLeft--;
-                    SwingUtilities.invokeLater(() -> timerLabel.setText("Waktu: " + timeLeft + " detik"));
-                } else {
-                    timer.cancel();
-                    SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null, "Waktu Habis!"));
-                }
+            public void actionPerformed(ActionEvent e) {
+                startLayanan();
             }
-        }, 0, 1000);
+        });
+
+        stopButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                stopLayanan();
+            }
+        });
+
+        frame.setVisible(true);
     }
-
-    private void aiMove() {
-        new Thread(() -> {
-            try {
-                Thread.sleep(500);
-                int row, col;
-                do {
-                    row = random.nextInt(SIZE);
-                    col = random.nextInt(SIZE);
-                } while (board[row][col] != '\0');
-
-                board[row][col] = 'O';
-                removeSOS();
-                playerTurn = true;
-                repaint();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+    
+    private void startLayanan() {
+        if (!isRunning) {
+            isRunning = true;
+            executor = Executors.newFixedThreadPool(3);
+            textArea.append("Memulai Layanan Bank...\n");
+            
+            for (int i = 1; i <= 3; i++) {
+                int pelangganId = i;
+                executor.execute(() -> layaniPelanggan(pelangganId));
             }
-        }).start();
+            
+            startButton.setEnabled(false);
+            stopButton.setEnabled(true);
+        }
     }
-
-    private void removeSOS() {
-        for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE - 2; j++) {
-                if (board[i][j] == 'S' && board[i][j + 1] == 'O' && board[i][j + 2] == 'S') {
-                    board[i][j] = board[i][j + 1] = board[i][j + 2] = '\0';
-                }
+    
+    private void layaniPelanggan(int pelangganId) {
+        try {
+            for (int i = 1; i <= 5 && isRunning; i++) {
+                Thread.sleep(1000);
+                appendText("Pelanggan " + pelangganId + " sedang dilayani: langkah " + i);
             }
+            appendText("Pelanggan " + pelangganId + " telah selesai dilayani.");
+        } catch (InterruptedException e) {
+            appendText("Layanan pelanggan " + pelangganId + " terganggu.");
         }
-        for (int i = 0; i < SIZE - 2; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                if (board[i][j] == 'S' && board[i + 1][j] == 'O' && board[i + 2][j] == 'S') {
-                    board[i][j] = board[i + 1][j] = board[i + 2][j] = '\0';
-                }
-            }
+    }
+    
+    private void stopLayanan() {
+        if (isRunning) {
+            isRunning = false;
+            executor.shutdownNow();
+            textArea.append("Semua layanan dihentikan.\n");
+            startButton.setEnabled(true);
+            stopButton.setEnabled(false);
         }
+    }
+    
+    private void appendText(String text) {
+        SwingUtilities.invokeLater(() -> textArea.append(text + "\n"));
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new Tugas3().setVisible(true));
-    }
-
-    class SOSBoard extends JPanel {
-        public SOSBoard() {
-            addMouseListener(new MouseAdapter() {
-                @Override
-                public void mouseClicked(MouseEvent e) {
-                    if (!playerTurn) return;
-                    int tileSize = getWidth() / SIZE;
-                    int row = e.getY() / tileSize;
-                    int col = e.getX() / tileSize;
-                    if (row < SIZE && col < SIZE && board[row][col] == '\0') {
-                        board[row][col] = 'S';
-                        removeSOS();
-                        playerTurn = false;
-                        repaint();
-                        aiMove();
-                    }
-                }
-            });
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            int tileSize = getWidth() / SIZE;
-            for (int i = 0; i < SIZE; i++) {
-                for (int j = 0; j < SIZE; j++) {
-                    g.drawRect(j * tileSize, i * tileSize, tileSize, tileSize);
-                    if (board[i][j] != '\0') {
-                        g.setFont(new Font("Arial", Font.BOLD, tileSize / 2));
-                        g.drawString(String.valueOf(board[i][j]), j * tileSize + tileSize / 3, i * tileSize + tileSize / 2);
-                    }
-                }
-            }
-        }
+        SwingUtilities.invokeLater(Tugas3::new);
     }
 }
